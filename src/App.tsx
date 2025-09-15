@@ -1,5 +1,6 @@
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { Upload, Camera, CheckCircle, AlertCircle, FileText, Shield, X, ChevronRight, Loader2, User, Lock } from 'lucide-react';
+import Tesseract from 'tesseract.js';
 
 // Define types for form data
 interface FormData {
@@ -33,6 +34,17 @@ const KYCSubmissionWebsite: React.FC = () => {
   const [showCamera, setShowCamera] = useState<boolean>(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [ocrProcessing, setOcrProcessing] = useState<boolean>(false);
+  // OCR extracted data
+  const [ocrData, setOcrData] = useState<{
+    fullName: string | null;
+    documentNumber: string | null;
+    dateOfBirth: string | null;
+  }>({
+    fullName: null,
+    documentNumber: null,
+    dateOfBirth: null
+  });
   
   const frontFileInputRef = useRef<HTMLInputElement>(null);
   const backFileInputRef = useRef<HTMLInputElement>(null);
@@ -96,14 +108,19 @@ const KYCSubmissionWebsite: React.FC = () => {
       }
       
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
+        const imageDataUrl = reader.result as string;
+        
         if (type === 'front') {
           setDocumentFrontFile(file);
-          setDocumentFrontPreview(reader.result as string);
+          setDocumentFrontPreview(imageDataUrl);
           setErrors(prev => ({ ...prev, documentFront: undefined }));
+          
+          // Extract text from the front document image
+          await extractTextFromImage(imageDataUrl);
         } else if (type === 'back') {
           setDocumentBackFile(file);
-          setDocumentBackPreview(reader.result as string);
+          setDocumentBackPreview(imageDataUrl);
           setErrors(prev => ({ ...prev, documentBack: undefined }));
         }
       };
@@ -314,6 +331,8 @@ const KYCSubmissionWebsite: React.FC = () => {
         setTimeout(startCamera, 300); // Small delay to ensure DOM is ready
       }
     } else if (currentStep === 2 && validateStep2()) {
+      setCurrentStep(3);
+    } else if (currentStep === 3) {
       handleSubmit();
     }
   };
@@ -343,12 +362,84 @@ const KYCSubmissionWebsite: React.FC = () => {
     setErrors({});
     setSubmitSuccess(false);
     setCameraError(null);
+    setOcrProcessing(false);
+    setOcrData({
+      fullName: null,
+      documentNumber: null,
+      dateOfBirth: null
+    });
     
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
     setShowCamera(false);
+  };
+
+  // Function to extract text from document image using Tesseract OCR
+  const extractTextFromImage = async (imageSrc: string) => {
+    try {
+      setOcrProcessing(true);
+      
+      const result = await Tesseract.recognize(
+        imageSrc,
+        'eng',
+        { 
+          logger: (m) => console.log(m)
+        }
+      );
+      
+      const text = result.data.text;
+      console.log('OCR Result:', text);
+      
+      // Extract information from text (basic implementation)
+      // In a real application, you would use more sophisticated pattern matching
+      // based on the type of document being processed
+      let fullName = null;
+      let documentNumber = null;
+      let dateOfBirth = null;
+      
+      // Simple pattern matching - this is a basic implementation
+      // A production system would need more robust document-specific parsing
+      const lines = text.split('\n').filter(line => line.trim() !== '');
+      
+      // Look for name patterns (this is very basic)
+      for (let i = 0; i < Math.min(5, lines.length); i++) {
+        const line = lines[i].trim();
+        // Simple heuristic: if line contains mostly letters and spaces, might be a name
+        if (line.length > 5 && /^[A-Za-z\s]+$/.test(line) && line.split(' ').length >= 2) {
+          fullName = line;
+          break;
+        }
+      }
+      
+      // Look for document number patterns
+      const docNumberRegex = /[A-Z0-9]{5,15}/;
+      const docNumberMatch = text.match(docNumberRegex);
+      if (docNumberMatch) {
+        documentNumber = docNumberMatch[0];
+      }
+      
+      // Look for date patterns (MM/DD/YYYY, DD/MM/YYYY, etc.)
+      const dateRegex = /\b\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}\b/;
+      const dateMatch = text.match(dateRegex);
+      if (dateMatch) {
+        dateOfBirth = dateMatch[0];
+      }
+      
+      setOcrData({
+        fullName,
+        documentNumber,
+        dateOfBirth
+      });
+      
+      setOcrProcessing(false);
+      return { fullName, documentNumber, dateOfBirth };
+    } catch (error) {
+      console.error('OCR Error:', error);
+      setOcrProcessing(false);
+      return { fullName: null, documentNumber: null, dateOfBirth: null };
+    }
   };
 
   if (submitSuccess) {
@@ -379,95 +470,95 @@ const KYCSubmissionWebsite: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Modern Header with Branding */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        {/* Compact Header with Branding */}
+        <div className="bg-white rounded-xl shadow-md p-4 mb-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl mr-4 shadow-lg">
-                <Shield className="w-7 h-7" />
+              <div className="inline-flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-lg mr-3">
+                <Shield className="w-5 h-5" />
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Identity Verification</h1>
-                <p className="text-gray-600 mt-1">Complete your KYC process securely and efficiently</p>
+                <h1 className="text-lg font-bold text-gray-900">Identity Verification</h1>
               </div>
             </div>
             
-            <div className="bg-blue-50 rounded-xl px-4 py-3">
-              <div className="flex items-center text-blue-800">
-                <Lock className="w-5 h-5 mr-2" />
-                <span className="font-medium text-sm">Bank-level security</span>
-              </div>
+            <div className="hidden sm:flex items-center bg-blue-50 rounded-lg px-2 py-1">
+              <Lock className="w-4 h-4 text-blue-600 mr-1" />
+              <span className="text-xs font-medium text-blue-700">Secure</span>
             </div>
           </div>
         </div>
 
-        {/* Enhanced Progress Indicator */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-          <div className="flex items-center justify-between relative">
-            {/* Progress line */}
-            <div className="absolute inset-x-0 top-1/2 h-1 bg-gray-200 -z-10 mx-8"></div>
-            <div 
-              className={`absolute inset-x-0 top-1/2 h-1 -z-10 mx-8 transition-all duration-500 ease-in-out ${
-                currentStep > 1 ? 'bg-blue-600' : 'bg-gray-200'
-              }`} 
-              style={{ 
-                width: currentStep > 1 ? '100%' : '0%',
-                marginLeft: '2rem',
-                marginRight: '2rem'
-              }}
-            ></div>
-            
+        {/* Minimal Progress Indicator */}
+        <div className="bg-white rounded-lg shadow-sm p-2 mb-4">
+          <div className="flex items-center">
             {/* Step 1 */}
-            <div className="flex flex-col items-center relative z-10">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+            <div className="flex items-center">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${
                 currentStep >= 1 
                   ? documentFrontFile 
-                    ? 'bg-green-500 text-white shadow-lg' 
-                    : 'bg-blue-600 text-white shadow-lg'
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-500'
               }`}>
-                {documentFrontFile ? (
-                  <CheckCircle className="w-6 h-6" />
-                ) : (
-                  <span className="font-bold">1</span>
-                )}
+                {documentFrontFile ? <CheckCircle className="w-3 h-3" /> : '1'}
               </div>
-              <span className={`mt-2 font-medium text-sm ${
-                currentStep >= 1 ? 'text-blue-600' : 'text-gray-500'
-              }`}>
-                Document
-              </span>
+            </div>
+            
+            {/* Progress line to Step 2 */}
+            <div className="flex-1 mx-1">
+              <div className="h-0.5 bg-gray-200 rounded-full">
+                <div 
+                  className={`h-0.5 rounded-full transition-all duration-300 ${
+                    currentStep > 1 ? 'bg-blue-600' : 'bg-gray-200'
+                  }`} 
+                  style={{ width: currentStep > 1 ? '100%' : '0%' }}
+                ></div>
+              </div>
             </div>
             
             {/* Step 2 */}
-            <div className="flex flex-col items-center relative z-10">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+            <div className="flex items-center">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${
                 currentStep >= 2 
                   ? selfieFile 
-                    ? 'bg-green-500 text-white shadow-lg' 
-                    : 'bg-blue-600 text-white shadow-lg border-2 border-blue-500'
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-500'
               }`}>
-                {selfieFile ? (
-                  <CheckCircle className="w-6 h-6" />
-                ) : (
-                  <span className="font-bold">2</span>
-                )}
+                {selfieFile ? <CheckCircle className="w-3 h-3" /> : '2'}
               </div>
-              <span className={`mt-2 font-medium text-sm ${
-                currentStep >= 2 ? 'text-blue-600' : 'text-gray-500'
-              }`}>
-                Selfie
-              </span>
             </div>
-          </div>
-          
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              Step <span className="font-bold text-blue-600">{currentStep}</span> of 2: {
-                currentStep === 1 ? 'Upload your identification document' : 'Capture a selfie for verification'
-              }
-            </p>
+            
+            {/* Progress line to Step 3 */}
+            <div className="flex-1 mx-1">
+              <div className="h-0.5 bg-gray-200 rounded-full">
+                <div 
+                  className={`h-0.5 rounded-full transition-all duration-300 ${
+                    currentStep > 2 ? 'bg-blue-600' : 'bg-gray-200'
+                  }`} 
+                  style={{ width: currentStep > 2 ? '100%' : '0%' }}
+                ></div>
+              </div>
+            </div>
+            
+            {/* Step 3 */}
+            <div className="flex items-center">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${
+                currentStep >= 3 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-gray-200 text-gray-500'
+              }`}>
+                3
+              </div>
+            </div>
+            
+            {/* Step text */}
+            <div className="ml-2">
+              <p className="text-gray-600 text-xs">
+                Step <span className="font-bold text-blue-600">{currentStep}</span>/3
+              </p>
+            </div>
           </div>
         </div>
 
@@ -482,7 +573,7 @@ const KYCSubmissionWebsite: React.FC = () => {
                   Document Upload
                 </h2>
                 <div className="hidden md:block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full font-medium">
-                  Step 1 of 2
+                  Step 1 of 3
                 </div>
               </div>
               
@@ -634,7 +725,7 @@ const KYCSubmissionWebsite: React.FC = () => {
                   Selfie Verification
                 </h2>
                 <div className="hidden md:block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full font-medium">
-                  Step 2 of 2
+                  Step 3 of 3
                 </div>
               </div>
               
@@ -657,14 +748,15 @@ const KYCSubmissionWebsite: React.FC = () => {
                 {showCamera ? (
                   <div className="relative">
                     <div className="relative bg-gray-900 rounded-lg overflow-hidden">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full max-w-md mx-auto block"
-                        style={{ maxHeight: '400px', aspectRatio: '3/4', objectFit: 'cover' }}
-                      />
+                      <div className="aspect-w-3 aspect-h-4 w-full max-w-md mx-auto">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                       {/* Watermark overlay */}
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div className="bg-white bg-opacity-30 rounded-full p-4">
@@ -775,6 +867,153 @@ const KYCSubmissionWebsite: React.FC = () => {
             </div>
           )}
 
+          {/* Step 3: Summary */}
+          {currentStep === 3 && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl md:text-2xl font-semibold text-gray-800 flex items-center">
+                  <FileText className="w-5 h-5 md:w-6 md:h-6 mr-2 text-blue-600" />
+                  Review Extracted Information
+                </h2>
+                <div className="hidden md:block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full font-medium">
+                  Step 3 of 3
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">Please review extracted information</p>
+                    <p>Information below is automatically extracted from your document using OCR. Make sure all details are correct before submitting for verification.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Personal Information</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Full Name</p>
+                      <p className="font-medium text-gray-800">
+                        {ocrProcessing ? (
+                          <span className="text-gray-500">Processing...</span>
+                        ) : ocrData.fullName ? (
+                          ocrData.fullName
+                        ) : (
+                          <span className="text-gray-500">Not detected (OCR will attempt to extract this information from your document)</span>
+                        )}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm text-gray-500">Date of Birth</p>
+                      <p className="font-medium text-gray-800">
+                        {ocrProcessing ? (
+                          <span className="text-gray-500">Processing...</span>
+                        ) : ocrData.dateOfBirth ? (
+                          ocrData.dateOfBirth
+                        ) : (
+                          <span className="text-gray-500">Not detected (OCR will attempt to extract this information from your document)</span>
+                        )}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm text-gray-500">Document Type</p>
+                      <p className="font-medium text-gray-800">
+                        {formData.documentType === 'passport' && 'Passport'}
+                        {formData.documentType === 'id_card' && 'National ID Card'}
+                        {formData.documentType === 'drivers_license' && 'Driver\'s License'}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm text-gray-500">Document Number</p>
+                      <p className="font-medium text-gray-800">
+                        {ocrProcessing ? (
+                          <span className="text-gray-500">Processing...</span>
+                        ) : ocrData.documentNumber ? (
+                          ocrData.documentNumber
+                        ) : (
+                          <span className="text-gray-500">Not detected (OCR will attempt to extract this information from your document)</span>
+                        )}
+                      </p>
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <p className="text-sm text-gray-500">Issuing Country</p>
+                      <p className="font-medium text-gray-800">{formData.country || 'Not provided'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800">
+                      <span className="font-medium">Note:</span> Information above is automatically extracted from your document using OCR. 
+                      {ocrProcessing && " OCR processing is currently in progress..."}
+                      If any information is incorrect or missing, please ensure your document is clear and well-lit when uploading.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="border-t border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Uploaded Documents</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex flex-col">
+                      <p className="text-sm text-gray-500 mb-2">Document Front</p>
+                      {documentFrontPreview ? (
+                        <img 
+                          src={documentFrontPreview} 
+                          alt="Document front" 
+                          className="rounded-lg border border-gray-300 h-32 object-contain"
+                        />
+                      ) : (
+                        <div className="bg-gray-100 border border-gray-300 border-dashed rounded-lg h-32 flex items-center justify-center">
+                          <p className="text-gray-500 text-sm">Not uploaded</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {['id_card', 'drivers_license'].includes(formData.documentType) && (
+                      <div className="flex flex-col">
+                        <p className="text-sm text-gray-500 mb-2">Document Back</p>
+                        {documentBackPreview ? (
+                          <img 
+                            src={documentBackPreview} 
+                            alt="Document back" 
+                            className="rounded-lg border border-gray-300 h-32 object-contain"
+                          />
+                        ) : (
+                          <div className="bg-gray-100 border border-gray-300 border-dashed rounded-lg h-32 flex items-center justify-center">
+                            <p className="text-gray-500 text-sm">Not uploaded</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-col">
+                      <p className="text-sm text-gray-500 mb-2">Selfie</p>
+                      {selfiePreview ? (
+                        <img 
+                          src={selfiePreview} 
+                          alt="Selfie" 
+                          className="rounded-lg border border-gray-300 h-32 object-contain"
+                        />
+                      ) : (
+                        <div className="bg-gray-100 border border-gray-300 border-dashed rounded-lg h-32 flex items-center justify-center">
+                          <p className="text-gray-500 text-sm">Not captured</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Navigation Buttons */}
           <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
             {currentStep > 1 && (
@@ -798,7 +1037,7 @@ const KYCSubmissionWebsite: React.FC = () => {
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                   Submitting...
                 </>
-              ) : currentStep === 2 ? (
+              ) : currentStep === 3 ? (
                 'Submit for Verification'
               ) : (
                 <>
