@@ -1,5 +1,5 @@
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
-import { Upload, Camera, CheckCircle, AlertCircle, FileText, Shield, X, ChevronRight, Loader2 } from 'lucide-react';
+import { Upload, Camera, CheckCircle, AlertCircle, FileText, Shield, X, ChevronRight, Loader2, User, Lock } from 'lucide-react';
 
 // Define types for form data
 interface FormData {
@@ -377,65 +377,97 @@ const KYCSubmissionWebsite: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-6 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Compact Header */}
-        <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
-          <div className="flex items-center justify-between">
+        {/* Modern Header with Branding */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-center">
-              <div className="inline-flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-lg mr-3">
-                <Shield className="w-5 h-5" />
+              <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl mr-4 shadow-lg">
+                <Shield className="w-7 h-7" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-800">Identity Verification</h1>
-                <p className="text-sm text-gray-600">Complete your KYC in 2 steps</p>
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Identity Verification</h1>
+                <p className="text-gray-600 mt-1">Complete your KYC process securely and efficiently</p>
               </div>
             </div>
-            <div className="hidden md:flex items-center space-x-4 text-sm">
-              <div className={`flex items-center ${currentStep >= 1 ? 'text-blue-600' : 'text-gray-400'}`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2 ${
-                  currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {documentFrontFile ? <CheckCircle className="w-4 h-4" /> : '1'}
-                </div>
-                <span>Document</span>
-              </div>
-              <div className={`flex items-center ${currentStep >= 2 ? 'text-blue-600' : 'text-gray-400'}`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2 ${
-                  currentStep >= 2 && selfieFile ? 'bg-blue-600 text-white' : currentStep >= 2 ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {selfieFile ? <CheckCircle className="w-4 h-4" /> : '2'}
-                </div>
-                <span>Selfie</span>
+            
+            <div className="bg-blue-50 rounded-xl px-4 py-3">
+              <div className="flex items-center text-blue-800">
+                <Lock className="w-5 h-5 mr-2" />
+                <span className="font-medium text-sm">Bank-level security</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Mobile Step Status */}
-        <div className="md:hidden bg-white rounded-lg p-3 mb-6 shadow-sm">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-2">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
+        {/* Enhanced Progress Indicator */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+          <div className="flex items-center justify-between relative">
+            {/* Progress line */}
+            <div className="absolute inset-x-0 top-1/2 h-1 bg-gray-200 -z-10 mx-8"></div>
+            <div 
+              className={`absolute inset-x-0 top-1/2 h-1 -z-10 mx-8 transition-all duration-500 ease-in-out ${
+                currentStep > 1 ? 'bg-blue-600' : 'bg-gray-200'
+              }`} 
+              style={{ 
+                width: currentStep > 1 ? '100%' : '0%',
+                marginLeft: '2rem',
+                marginRight: '2rem'
+              }}
+            ></div>
+            
+            {/* Step 1 */}
+            <div className="flex flex-col items-center relative z-10">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+                currentStep >= 1 
+                  ? documentFrontFile 
+                    ? 'bg-green-500 text-white shadow-lg' 
+                    : 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-200 text-gray-500'
               }`}>
-                {documentFrontFile ? <CheckCircle className="w-4 h-4" /> : '1'}
+                {documentFrontFile ? (
+                  <CheckCircle className="w-6 h-6" />
+                ) : (
+                  <span className="font-bold">1</span>
+                )}
               </div>
-              <span className={currentStep >= 1 ? 'font-medium text-blue-600' : 'text-gray-500'}>Document</span>
+              <span className={`mt-2 font-medium text-sm ${
+                currentStep >= 1 ? 'text-blue-600' : 'text-gray-500'
+              }`}>
+                Document
+              </span>
             </div>
             
-            <div className="flex-1 mx-3">
-              <div className={`h-1 rounded-full ${currentStep > 1 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                currentStep >= 2 && selfieFile ? 'bg-blue-600 text-white' : currentStep >= 2 ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-500'
+            {/* Step 2 */}
+            <div className="flex flex-col items-center relative z-10">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+                currentStep >= 2 
+                  ? selfieFile 
+                    ? 'bg-green-500 text-white shadow-lg' 
+                    : 'bg-blue-600 text-white shadow-lg border-2 border-blue-500'
+                  : 'bg-gray-200 text-gray-500'
               }`}>
-                {selfieFile ? <CheckCircle className="w-4 h-4" /> : '2'}
+                {selfieFile ? (
+                  <CheckCircle className="w-6 h-6" />
+                ) : (
+                  <span className="font-bold">2</span>
+                )}
               </div>
-              <span className={currentStep >= 2 ? 'font-medium text-blue-600' : 'text-gray-500'}>Selfie</span>
+              <span className={`mt-2 font-medium text-sm ${
+                currentStep >= 2 ? 'text-blue-600' : 'text-gray-500'
+              }`}>
+                Selfie
+              </span>
             </div>
+          </div>
+          
+          <div className="mt-6 text-center">
+            <p className="text-gray-600">
+              Step <span className="font-bold text-blue-600">{currentStep}</span> of 2: {
+                currentStep === 1 ? 'Upload your identification document' : 'Capture a selfie for verification'
+              }
+            </p>
           </div>
         </div>
 
@@ -633,6 +665,12 @@ const KYCSubmissionWebsite: React.FC = () => {
                         className="w-full max-w-md mx-auto block"
                         style={{ maxHeight: '400px', aspectRatio: '3/4', objectFit: 'cover' }}
                       />
+                      {/* Watermark overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="bg-white bg-opacity-30 rounded-full p-4">
+                          <User className="w-16 h-16 text-white opacity-80" />
+                        </div>
+                      </div>
                       {/* Loading indicator while camera initializes */}
                       {!stream && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
